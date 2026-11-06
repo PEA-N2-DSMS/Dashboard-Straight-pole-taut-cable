@@ -9,19 +9,25 @@ const planClass=r=>r[1]&&r[2]&&r[3]?'complete':r[1]&&!r[2]?'memoOnly':r[2]&&!r[1
 const classLabel=r=>({complete:'มีครบ: บันทึก + ชื่องาน + PT',memoOnly:'มีบันทึก · ยังไม่มี PT ใน MJM',ptOnly:'มี PT · ยังไม่มีเลขบันทึก',partial:'ข้อมูลแผนยังไม่ครบ',empty:'ยังไม่ส่งแผน'}[planClass(r)]);
 const status=r=>r[5]||(isPlan(r)?'ยังไม่ระบุสถานะ':'ยังไม่มีแผน');
 function options(id,values){const old=$(id).value;$(id).innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(values)].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th')).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if([...$(id).options].some(o=>o.value===old))$(id).value=old;}
+function normalizeOffices(rows){
+ const groups=new Map();
+ const clean=rows.map(r=>{const c=[...r];c[0]=String(c[0]||'').replace(/[\u200B-\u200D\uFEFF]/g,'').trim();return c;});
+ for(const r of clean)if(r[0]&&r[4]&&!groups.has(r[0]))groups.set(r[0],r[4]);
+ return clean.filter(r=>r[0]).map(r=>{if(!r[4])r[4]=groups.get(r[0])||'';return r;});
+}
 function officeStats(rows){
  const map=new Map();
- for(const r of rows){if(!r[0])continue;const key=r[4]+'|'+r[0];if(!map.has(key))map.set(key,{name:r[0],group:r[4],rows:[],plans:[]});const o=map.get(key);o.rows.push(r);if(isPlan(r))o.plans.push(r);}
+ for(const r of rows){if(!r[0])continue;const key=r[0];if(!map.has(key))map.set(key,{name:r[0],group:r[4],rows:[],plans:[]});const o=map.get(key);o.rows.push(r);if(isPlan(r))o.plans.push(r);}
  return [...map.values()];
 }
 function syncOffices(){options('office',data.filter(r=>!$('group').value||r[4]===$('group').value).map(r=>r[0]));}
 function render(){
  const q=$('search').value.trim().toLocaleLowerCase('th'),group=$('group').value,office=$('office').value,st=$('status').value;
- const allOffices=officeStats(data),submittedKeys=new Set(allOffices.filter(o=>o.plans.length).map(o=>o.group+'|'+o.name));
- const sent=r=>submittedKeys.has(r[4]+'|'+r[0]);
+ const allOffices=officeStats(data),submittedKeys=new Set(allOffices.filter(o=>o.plans.length).map(o=>o.name));
+ const sent=r=>submittedKeys.has(r[0]);
  const scope=data.filter(r=>(!group||r[4]===group)&&(!office||r[0]===office));
  const scopedOffices=officeStats(scope).filter(o=>!q||o.rows.some(r=>r.join(' ').toLocaleLowerCase('th').includes(q)));
- const keys=new Set(scopedOffices.map(o=>o.group+'|'+o.name)),base=scope.filter(r=>keys.has(r[4]+'|'+r[0]));
+ const keys=new Set(scopedOffices.map(o=>o.group+'|'+o.name)),base=scope.filter(r=>keys.has(r[0]));
  const plans=base.filter(isPlan),done=scopedOffices.filter(o=>o.plans.length).length;
  $('submitted').textContent=done.toLocaleString('th');$('empty').textContent=(scopedOffices.length-done).toLocaleString('th');
  for(const kind of ['memoOnly','complete','ptOnly'])$(kind).textContent=plans.filter(r=>planClass(r)===kind).length.toLocaleString('th');
@@ -35,7 +41,7 @@ function render(){
  if(activeTab==='plans'){const wrap=$('plansPanel').querySelector('.tablewrap');size=Math.max(1,Math.floor((wrap.clientHeight-43)/56));}
  const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages-1);
  $('rows').innerHTML=filtered.slice(page*size,(page+1)*size).map(r=>'<tr class="'+(!sent(r)?'rowmissing':'')+'">'+r.slice(0,5).map(c=>'<td title="'+esc(c||'—')+'">'+esc(c||'—')+'</td>').join('')+'<td><span class="badge '+(sent(r)?'green':'orange')+'">'+esc(classLabel(r))+'</span></td><td>'+esc(r[5]||'—')+'</td></tr>').join('')||'<tr><td colspan="7">ไม่พบรายการตามเงื่อนไข</td></tr>';
- $('count').textContent='พบ '+filtered.length.toLocaleString('th')+' รายการ · '+new Set(filtered.map(r=>r[4]+'|'+r[0])).size+' หน่วยงาน · หน้า '+(page+1)+' / '+pages;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;
+ $('count').textContent='พบ '+filtered.length.toLocaleString('th')+' รายการ · '+new Set(filtered.map(r=>r[0])).size+' หน่วยงาน · หน้า '+(page+1)+' / '+pages;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;
 }
 
 function showDetails(kind){
@@ -82,7 +88,7 @@ function load(){
  const cb='peaSheet'+Date.now(),script=document.createElement('script');let timer;
  function done(){clearTimeout(timer);script.remove();delete window[cb];loading=false;$('refresh').disabled=false;}
  function fail(){done();$('message').className='message error';$('message').textContent='อ่านข้อมูลไม่ได้ กรุณาตรวจว่าชีตเปิดให้ทุกคนที่มีลิงก์ดูได้ แล้วกดอัปเดตข้อมูลอีกครั้ง'+(data.length?' · กำลังแสดงข้อมูลจากการดึงครั้งก่อน':'');if(!data.length){$('rows').innerHTML='<tr><td colspan="7">ยังไม่สามารถเชื่อมต่อ Google Sheets ได้</td></tr>';$('updated').textContent='เชื่อมต่อไม่สำเร็จ';}}
- window[cb]=response=>{try{if(response.status==='error'||!response.table)throw Error('Sheet unavailable');const rows=response.table.rows.map(row=>Array.from({length:6},(_,i)=>String(row.c[i]?.f??row.c[i]?.v??'').trim())).filter(r=>r.some(Boolean));data=rows.filter(r=>!(r[0]==='กฟฟ.'&&r[2]==='เลขใบงาน PT'));options('group',data.map(r=>r[4]));options('status',data.map(status));syncOffices();$('message').className='message';$('message').textContent='เชื่อมต่อ Google Sheets สำเร็จ · ข้อมูลล่าสุดที่ดึงจากชีต โดยไม่แก้ไขข้อมูลต้นฉบับ';$('updated').textContent='ดึงข้อมูลล่าสุด '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});render();done();}catch(e){fail();}};
+ window[cb]=response=>{try{if(response.status==='error'||!response.table)throw Error('Sheet unavailable');const rows=response.table.rows.map(row=>Array.from({length:6},(_,i)=>String(row.c[i]?.f??row.c[i]?.v??'').trim())).filter(r=>r.some(Boolean));data=normalizeOffices(rows.filter(r=>!(r[0]==='กฟฟ.'&&r[2]==='เลขใบงาน PT')));options('group',data.map(r=>r[4]));options('status',data.map(status));syncOffices();$('message').className='message';$('message').textContent='เชื่อมต่อ Google Sheets สำเร็จ · ข้อมูลล่าสุดที่ดึงจากชีต โดยไม่แก้ไขข้อมูลต้นฉบับ';$('updated').textContent='ดึงข้อมูลล่าสุด '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});render();done();}catch(e){fail();}};
  script.onerror=fail;script.src='https://docs.google.com/spreadsheets/d/'+SHEET+'/gviz/tq?sheet='+encodeURIComponent('แผนงานปี 70')+'&headers=1&tq='+encodeURIComponent('select A,B,C,D,E,F')+'&tqx='+encodeURIComponent('out:json;responseHandler:'+cb)+'&_='+Date.now();timer=setTimeout(fail,20000);document.head.appendChild(script);
 }
 ['search','group','office','status','mode'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',()=>{page=0;if(id==='group'){$('office').value='';syncOffices();}render();}));
