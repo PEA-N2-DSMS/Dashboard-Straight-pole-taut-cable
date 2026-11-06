@@ -8,7 +8,7 @@ const isPlan=r=>Boolean(r[2]||r[3]);
 const planClass=r=>r[1]&&r[2]&&r[3]?'complete':r[1]&&!r[2]?'memoOnly':r[2]&&!r[1]?'ptOnly':isPlan(r)?'partial':'empty';
 const classLabel=r=>({complete:'มีครบ: บันทึก + ชื่องาน + PT',memoOnly:'มีบันทึก · ยังไม่มี PT ใน MJM',ptOnly:'มี PT · ยังไม่มีเลขบันทึก',partial:'ข้อมูลแผนยังไม่ครบ',empty:'ยังไม่ส่งแผน'}[planClass(r)]);
 const status=r=>r[5]||(isPlan(r)?'ยังไม่ระบุสถานะ':'ยังไม่มีแผน');
-const distanceValue=r=>{const text=String(r[6]??'').trim().replace(/,/g,'');if(!text)return null;return /^\\d+(?:\\.\\d+)?$/.test(text)?Number(text):null;};
+const distanceValue=r=>{const text=String(r[6]??'').trim().replace(/,/g,'');if(!text)return null;return /^\d+(?:\.\d+)?$/.test(text)?Number(text):null;};
 const distanceSummary=rows=>{const known=rows.filter(r=>distanceValue(r)!==null);return {count:known.length,total:known.reduce((sum,r)=>sum+distanceValue(r),0)};};
 const fmt=n=>n.toLocaleString('th-TH',{maximumFractionDigits:2});
 function options(id,values){const old=$(id).value;$(id).innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(values)].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th')).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if([...$(id).options].some(o=>o.value===old))$(id).value=old;}
