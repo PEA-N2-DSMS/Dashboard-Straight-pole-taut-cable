@@ -5,6 +5,8 @@ let data=[],page=0,loading=false;
 const size=25;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const isPlan=r=>Boolean(r[2]||r[3]);
+const planClass=r=>r[1]&&r[2]&&r[3]?'complete':r[1]&&!r[2]?'memoOnly':r[2]&&!r[1]?'ptOnly':isPlan(r)?'partial':'empty';
+const classLabel=r=>({complete:'มีครบ: บันทึก + ชื่องาน + PT',memoOnly:'มีบันทึก · ยังไม่มี PT ใน MJM',ptOnly:'มี PT · ยังไม่มีเลขบันทึก',partial:'ข้อมูลแผนยังไม่ครบ',empty:'ยังไม่ส่งแผน'}[planClass(r)]);
 const status=r=>r[5]||(isPlan(r)?'ยังไม่ระบุสถานะ':'ยังไม่มีแผน');
 function options(id,values){const old=$(id).value;$(id).innerHTML='<option value="">ทั้งหมด</option>'+[...new Set(values)].filter(Boolean).sort((a,b)=>a.localeCompare(b,'th')).map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');if([...$(id).options].some(o=>o.value===old))$(id).value=old;}
 function officeStats(rows){
@@ -21,16 +23,38 @@ function render(){
  const scopedOffices=officeStats(scope).filter(o=>!q||o.rows.some(r=>r.join(' ').toLocaleLowerCase('th').includes(q)));
  const keys=new Set(scopedOffices.map(o=>o.group+'|'+o.name)),base=scope.filter(r=>keys.has(r[4]+'|'+r[0]));
  const plans=base.filter(isPlan),done=scopedOffices.filter(o=>o.plans.length).length;
- $('total').textContent=base.length.toLocaleString('th');$('officeTotal').textContent=scopedOffices.length.toLocaleString('th');$('submitted').textContent=done.toLocaleString('th');$('empty').textContent=(scopedOffices.length-done).toLocaleString('th');$('planTotal').textContent=plans.length.toLocaleString('th');
- $('planMeta').textContent='มี PT '+plans.filter(r=>r[2]).length+' · ยังไม่มี PT '+plans.filter(r=>!r[2]).length+' รายการ';
+ $('submitted').textContent=done.toLocaleString('th');$('empty').textContent=(scopedOffices.length-done).toLocaleString('th');
+ for(const kind of ['memoOnly','complete','ptOnly'])$(kind).textContent=plans.filter(r=>planClass(r)===kind).length.toLocaleString('th');
+ $('coverage').textContent='ขอบเขตเขต: 108 กฟฟ. / 12 จุดรวมงาน · พบรายชื่อไม่ซ้ำในข้อมูลปัจจุบัน '+allOffices.length+' กฟฟ. (ต่างจากขอบเขต '+Math.max(0,108-allOffices.length)+' กฟฟ. ที่ยังไม่มีรายชื่อสำหรับตรวจสอบ) · ยอดส่งแล้ว / ยังไม่ส่ง นับเป็น กฟฟ. ไม่ใช่จำนวนแผน';
+ $('planMeta').textContent='ได้รับ '+plans.length+' แผน · มี PT '+plans.filter(r=>r[2]).length+' · ยังไม่มี PT '+plans.filter(r=>!r[2]).length+' รายการ';
  const groupNames=[...new Set(data.map(r=>r[4]))].filter(Boolean);
  $('groups').innerHTML=groupNames.map(g=>{const os=allOffices.filter(o=>o.group===g),s=os.filter(o=>o.plans.length).length,p=os.reduce((n,o)=>n+o.plans.length,0);return '<article class="groupcard '+(g===group?'active':'')+'"><h3>'+esc(g)+'</h3><div class="groupstats"><span>ทั้งหมด <b>'+os.length+'</b> แห่ง</span><span>ส่งแล้ว <b>'+s+'</b></span><span class="warn">ยังไม่ส่ง <b>'+(os.length-s)+'</b></span></div><div class="trackbar"><span style="width:'+(os.length?s/os.length*100:0)+'%"></span></div><p class="muted">ได้รับ '+p+' แผน · '+data.filter(r=>r[4]===g).length+' รายการในชีต</p><div class="groupactions"><button data-group="'+esc(g)+'" data-mode="all">ดูจุดย่อย</button><button data-group="'+esc(g)+'" data-mode="empty">ติดตามที่ยังไม่ส่ง ('+(os.length-s)+')</button></div></article>';}).join('');
  const mode=$('mode').value;
  const filtered=base.filter(r=>(!q||r.join(' ').toLocaleLowerCase('th').includes(q))&&(!st||status(r)===st)&&(mode==='all'||(mode==='plans'?isPlan(r):mode==='submitted'?sent(r):!sent(r))));
  const pages=Math.max(1,Math.ceil(filtered.length/size));page=Math.min(page,pages-1);
- $('rows').innerHTML=filtered.slice(page*size,(page+1)*size).map(r=>'<tr class="'+(!sent(r)?'rowmissing':'')+'">'+r.slice(0,5).map(c=>'<td>'+esc(c||'—')+'</td>').join('')+'<td><span class="badge '+(sent(r)?'green':'orange')+'">'+(sent(r)?'ส่งแล้ว':'ยังไม่ส่งแผน')+'</span></td><td>'+esc(r[5]||'—')+'</td></tr>').join('')||'<tr><td colspan="7">ไม่พบรายการตามเงื่อนไข</td></tr>';
+ $('rows').innerHTML=filtered.slice(page*size,(page+1)*size).map(r=>'<tr class="'+(!sent(r)?'rowmissing':'')+'">'+r.slice(0,5).map(c=>'<td>'+esc(c||'—')+'</td>').join('')+'<td><span class="badge '+(sent(r)?'green':'orange')+'">'+esc(classLabel(r))+'</span></td><td>'+esc(r[5]||'—')+'</td></tr>').join('')||'<tr><td colspan="7">ไม่พบรายการตามเงื่อนไข</td></tr>';
  $('count').textContent='พบ '+filtered.length.toLocaleString('th')+' รายการ · '+new Set(filtered.map(r=>r[4]+'|'+r[0])).size+' หน่วยงาน · หน้า '+(page+1)+' / '+pages;$('prev').disabled=page===0;$('next').disabled=page>=pages-1;
 }
+
+function showDetails(kind){
+ const names={all:'รายชื่อ กฟฟ. แยกตามจุดรวมงาน',submitted:'กฟฟ. ที่ส่งแผนแล้ว',empty:'กฟฟ. ที่ยังไม่ส่งแผน',memoOnly:'มีเลขบันทึก แต่ยังไม่มีเลขแผน PT ใน MJM',complete:'มีครบ: เลขบันทึก + ชื่องาน + PT',ptOnly:'มี PT แต่ยังไม่มีเลขบันทึก'};
+ const q=$('search').value.trim().toLocaleLowerCase('th'),g=$('group').value,o=$('office').value;
+ const offices=officeStats(data.filter(r=>(!g||r[4]===g)&&(!o||r[0]===o))).filter(x=>!q||x.rows.some(r=>r.join(' ').toLocaleLowerCase('th').includes(q)));
+ let body='',count=0;
+ if(['all','submitted','empty'].includes(kind)){
+ const os=offices.filter(x=>kind==='all'||(kind==='submitted'?x.plans.length:!x.plans.length));
+ count=os.length;body='<table><thead><tr><th>จุดรวมงาน</th><th>การไฟฟ้า</th><th>จำนวนแผน</th><th>มีเลข PT</th><th>มีบันทึก ยังไม่มี PT</th><th>มีครบ</th><th>การส่งแผน</th></tr></thead><tbody>'+os.map(x=>'<tr><td>'+esc(x.group)+'</td><td>'+esc(x.name)+'</td><td>'+x.plans.length+'</td><td>'+x.plans.filter(r=>r[2]).length+'</td><td>'+x.plans.filter(r=>planClass(r)==='memoOnly').length+'</td><td>'+x.plans.filter(r=>planClass(r)==='complete').length+'</td><td><span class="badge '+(x.plans.length?'green':'orange')+'">'+(x.plans.length?'ส่งแล้ว':'ยังไม่ส่งแผน')+'</span></td></tr>').join('')+'</tbody></table>';
+ }else{
+ const rows=offices.flatMap(x=>x.plans).filter(r=>planClass(r)===kind);count=rows.length;
+ body='<table><thead><tr><th>การไฟฟ้า</th><th>เลขที่บันทึก</th><th>เลข PT</th><th>ชื่องาน</th><th>จุดรวมงาน</th><th>สถานะงาน PT</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+[r[0],r[1],r[2],r[3],r[4],r[5]].map(v=>'<td>'+esc(v||'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
+ }
+ $('detailTitle').textContent=names[kind]+' · '+count+(['all','submitted','empty'].includes(kind)?' กฟฟ.':' แผน');
+ $('detailNote').textContent='ตามจุดรวมงาน จุดย่อย และคำค้นที่เลือก · ตรวจจากช่องข้อมูลใน Google Sheets เท่านั้น ยังไม่ได้ตรวจสถานะในระบบ MJM โดยตรง'+(kind==='all'?' · พบรายชื่อ '+officeStats(data).length+' กฟฟ. จากขอบเขต 108 กฟฟ. ยังขาดรายชื่อสำหรับตรวจสอบ '+Math.max(0,108-officeStats(data).length)+' กฟฟ.':'');
+ $('detailBody').innerHTML=count?body:'<p>ไม่พบรายการตามเงื่อนไข</p>';$('detailDialog').showModal();
+}
+document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>showDetails(button.dataset.view));
+$('closeDetail').onclick=()=>$('detailDialog').close();
+
 function load(){
  if(loading)return;loading=true;$('refresh').disabled=true;
  const cb='peaSheet'+Date.now(),script=document.createElement('script');let timer;
