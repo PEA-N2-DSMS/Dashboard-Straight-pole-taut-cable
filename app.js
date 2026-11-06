@@ -25,8 +25,9 @@ function render(){
  const plans=base.filter(isPlan),done=scopedOffices.filter(o=>o.plans.length).length;
  $('submitted').textContent=done.toLocaleString('th');$('empty').textContent=(scopedOffices.length-done).toLocaleString('th');
  for(const kind of ['memoOnly','complete','ptOnly'])$(kind).textContent=plans.filter(r=>planClass(r)===kind).length.toLocaleString('th');
- $('coverage').textContent='ขอบเขตเขต: 108 กฟฟ. / 12 จุดรวมงาน · พบรายชื่อไม่ซ้ำในข้อมูลปัจจุบัน '+allOffices.length+' กฟฟ. (ต่างจากขอบเขต '+Math.max(0,108-allOffices.length)+' กฟฟ. ที่ยังไม่มีรายชื่อสำหรับตรวจสอบ) · ยอดส่งแล้ว / ยังไม่ส่ง นับเป็น กฟฟ. ไม่ใช่จำนวนแผน';
- $('planMeta').textContent='ได้รับ '+plans.length+' แผน · มี PT '+plans.filter(r=>r[2]).length+' · ยังไม่มี PT '+plans.filter(r=>!r[2]).length+' รายการ';
+ $('districtTotal').textContent=allOffices.length.toLocaleString('th');
+ $('coverage').textContent='เขต 2: '+allOffices.length+' การไฟฟ้าไม่นับซ้ำ / '+new Set(data.map(r=>r[4]).filter(Boolean)).size+' จุดรวมงาน · ส่งแล้วและยังไม่ส่งนับเป็นการไฟฟ้า · แต่ละการไฟฟ้าส่งได้หลายแผน';
+ $('planMeta').textContent='จำนวนแผนที่ได้รับ '+plans.length+' แผน (แยกจากจำนวนการไฟฟ้า) · มี PT '+plans.filter(r=>r[2]).length+' · ยังไม่มี PT '+plans.filter(r=>!r[2]).length+' รายการ';
  const groupNames=[...new Set(data.map(r=>r[4]))].filter(Boolean);const groupSize=window.innerWidth<600?4:window.innerWidth<1000||window.innerHeight<1050?6:12;groupPage=Math.min(groupPage,Math.max(0,Math.ceil(groupNames.length/groupSize)-1));$('groupPageText').textContent='จุดรวมงาน '+(groupPage*groupSize+1)+'–'+Math.min((groupPage+1)*groupSize,groupNames.length)+' / '+groupNames.length;$('groupPrev').disabled=groupPage===0;$('groupNext').disabled=(groupPage+1)*groupSize>=groupNames.length;$('groupPager').hidden=groupNames.length<=groupSize;
  $('groups').innerHTML=groupNames.slice(groupPage*groupSize,(groupPage+1)*groupSize).map(g=>{const os=allOffices.filter(o=>o.group===g),s=os.filter(o=>o.plans.length).length,p=os.reduce((n,o)=>n+o.plans.length,0);return '<article class="groupcard '+(g===group?'active':'')+'"><h3>'+esc(g)+'</h3><div class="groupstats"><span>ทั้งหมด <b>'+os.length+'</b> แห่ง</span><span>ส่งแล้ว <b>'+s+'</b></span><span class="warn">ยังไม่ส่ง <b>'+(os.length-s)+'</b></span></div><div class="trackbar"><span style="width:'+(os.length?s/os.length*100:0)+'%"></span></div><p class="muted">ได้รับ '+p+' แผน · '+data.filter(r=>r[4]===g).length+' รายการในชีต</p><div class="groupactions"><button data-group="'+esc(g)+'" data-mode="all">ดูจุดย่อย</button><button data-group="'+esc(g)+'" data-mode="empty">ติดตามที่ยังไม่ส่ง ('+(os.length-s)+')</button></div></article>';}).join('');
  const mode=$('mode').value;
@@ -50,7 +51,7 @@ function showDetails(kind){
  body='<table><thead><tr><th>การไฟฟ้า</th><th>เลขที่บันทึก</th><th>เลข PT</th><th>ชื่องาน</th><th>จุดรวมงาน</th><th>สถานะงาน PT</th></tr></thead><tbody>'+rows.map(r=>'<tr>'+[r[0],r[1],r[2],r[3],r[4],r[5]].map(v=>'<td title="'+esc(v||'—')+'">'+esc(v||'—')+'</td>').join('')+'</tr>').join('')+'</tbody></table>';
  }
  $('detailTitle').textContent=names[kind]+' · '+count+(['all','submitted','empty'].includes(kind)?' กฟฟ.':' แผน');
- $('detailNote').textContent='ตามจุดรวมงาน จุดย่อย และคำค้นที่เลือก · ตรวจจากช่องข้อมูลใน Google Sheets เท่านั้น ยังไม่ได้ตรวจสถานะในระบบ MJM โดยตรง'+(kind==='all'?' · พบรายชื่อ '+officeStats(data).length+' กฟฟ. จากขอบเขต 108 กฟฟ. ยังขาดรายชื่อสำหรับตรวจสอบ '+Math.max(0,108-officeStats(data).length)+' กฟฟ.':'');
+ $('detailNote').textContent='ตามจุดรวมงาน จุดย่อย และคำค้นที่เลือก · ตรวจจากช่องข้อมูลใน Google Sheets เท่านั้น ยังไม่ได้ตรวจสถานะในระบบ MJM โดยตรง'+(kind==='all'?' · รวม '+officeStats(data).length+' การไฟฟ้าไม่นับซ้ำ ไม่ใช่จำนวนแผน':'');
  $('detailBody').innerHTML=count?body:'<p>ไม่พบรายการตามเงื่อนไข</p>';$('detailDialog').showModal();detailPage=0;paginateDetails();
 }
 document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>showDetails(button.dataset.view));
