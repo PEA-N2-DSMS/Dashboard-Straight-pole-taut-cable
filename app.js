@@ -73,7 +73,9 @@ $('detailDialog').addEventListener('click',event=>{
 
 
 function switchTab(name){
- activeTab=name;for(const n of ['groups','plans','criteria']){$(n==='groups'?'groupPanel':n==='plans'?'plansPanel':'criteriaPanel').hidden=n!==name;$('tab-'+n).setAttribute('aria-selected',String(n===name));}render();
+ if(name==='map'){const frame=$('mapPanel').querySelector('iframe');if(!frame.src)frame.src=frame.dataset.src;}
+
+ activeTab=name;for(const n of ['groups','plans','criteria','map']){$(n==='groups'?'groupPanel':n==='plans'?'plansPanel':n==='map'?'mapPanel':'criteriaPanel').hidden=n!==name;$('tab-'+n).setAttribute('aria-selected',String(n===name));}render();
 }
 function paginateDetails(){
  const rows=[...$('detailBody').querySelectorAll('tbody tr')],perPage=Math.max(1,Math.floor(($('detailBody').clientHeight-43)/56));
