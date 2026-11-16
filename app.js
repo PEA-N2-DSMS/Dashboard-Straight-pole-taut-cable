@@ -101,12 +101,21 @@ document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.tar
 $('closeWork').onclick=()=>$('workDialog').close();
 $('workDialog').addEventListener('click',e=>{if(e.target!==$('workDialog'))return;const r=$('workDialog').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('workDialog').close();});
 
+function sheetRows(table){
+ const key=s=>String(s??'').replace(/[\s\u200B-\u200D\uFEFF]/g,'');
+ const labels=table.cols.map(c=>key(c.label));
+ const fields=[['กฟฟ.','การไฟฟ้า'],['เลขที่บันทึกแจ้งแผนงาน','เลขที่บันทึก'],['เลขใบงานPT','เลขPT'],['ชื่องาน'],['กฟฟ.จุดรวมงาน','จุดรวมงาน'],['สถานะงานPT'],['ระยะทาง'],['การแก้ไข']];
+ const indices=fields.map(names=>labels.findIndex(label=>names.some(n=>key(n)===label)));
+ if(indices.some(i=>i<0))throw Error('หัวคอลัมน์ข้อมูลไม่ครบ กรุณาตรวจโครงสร้างชีต');
+ return table.rows.map(row=>indices.map(i=>String(row.c[i]?.f??row.c[i]?.v??'').trim())).filter(r=>r.some(Boolean));
+}
+
 function load(){
  if(loading)return;loading=true;$('refresh').disabled=true;
  const cb='peaSheet'+Date.now(),script=document.createElement('script');let timer;
  function done(){clearTimeout(timer);script.remove();delete window[cb];loading=false;$('refresh').disabled=false;}
  function fail(){done();$('message').className='message error';$('message').textContent='อ่านข้อมูลไม่ได้ กรุณาตรวจว่าชีตเปิดให้ทุกคนที่มีลิงก์ดูได้ แล้วกดอัปเดตข้อมูลอีกครั้ง'+(data.length?' · กำลังแสดงข้อมูลจากการดึงครั้งก่อน':'');if(!data.length){$('rows').innerHTML='<tr><td colspan="9">ยังไม่สามารถเชื่อมต่อ Google Sheets ได้</td></tr>';$('updated').textContent='เชื่อมต่อไม่สำเร็จ';}}
- window[cb]=response=>{try{if(response.status==='error'||!response.table)throw Error('Sheet unavailable');const rows=response.table.rows.map(row=>Array.from({length:8},(_,i)=>String(row.c[i]?.f??row.c[i]?.v??'').trim())).filter(r=>r.some(Boolean));data=normalizeOffices(rows.filter(r=>!(r[0].replace(/\s/g,'')==='กฟฟ.'&&r[2]==='เลขใบงาน PT')));options('group',data.map(r=>r[4]));options('status',data.map(status));syncOffices();$('message').className='message';$('message').textContent='เชื่อมต่อ Google Sheets สำเร็จ · ข้อมูลล่าสุดที่ดึงจากชีต โดยไม่แก้ไขข้อมูลต้นฉบับ';$('updated').textContent='ดึงข้อมูลล่าสุด '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});render();done();}catch(e){fail();}};
+ window[cb]=response=>{try{if(response.status==='error'||!response.table)throw Error('Sheet unavailable');const rows=sheetRows(response.table);data=normalizeOffices(rows);options('group',data.map(r=>r[4]));options('status',data.map(status));syncOffices();$('message').className='message';$('message').textContent='เชื่อมต่อ Google Sheets สำเร็จ · ข้อมูลล่าสุดที่ดึงจากชีต โดยไม่แก้ไขข้อมูลต้นฉบับ';$('updated').textContent='ดึงข้อมูลล่าสุด '+new Date().toLocaleString('th-TH',{timeZone:'Asia/Bangkok'});render();done();}catch(e){fail();}};
  script.onerror=fail;script.src='https://docs.google.com/spreadsheets/d/'+SHEET+'/gviz/tq?sheet='+encodeURIComponent('แผนงานปี 70')+'&headers=1&tq='+encodeURIComponent('select A,B,C,D,E,F,G,H')+'&tqx='+encodeURIComponent('out:json;responseHandler:'+cb)+'&_='+Date.now();timer=setTimeout(fail,20000);document.head.appendChild(script);
 }
 ['search','group','office','status','mode'].forEach(id=>$(id).addEventListener(id==='search'?'input':'change',()=>{page=0;if(id==='group'){$('office').value='';syncOffices();}render();}));
