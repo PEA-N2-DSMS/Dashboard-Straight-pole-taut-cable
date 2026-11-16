@@ -25,7 +25,7 @@ jobs:
       - name: Prepare website
         run: |
           mkdir -p _site
-          cp index.html app.js _site/
+          cp index.html app.js routes.html routes.js routes-data.json _site/
           cp -R assets _site/assets
       - uses: actions/upload-pages-artifact@v3
         with:
